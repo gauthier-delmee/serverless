@@ -4,14 +4,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
-	"strconv"
-
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/aws/external"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/external"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 )
 
 // Movie structure
@@ -20,12 +18,13 @@ type Movie struct {
 	Name string `json:"name"`
 }
 
-func findAll(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	size, err := strconv.Atoi(request.Headers["Count"])
+func update(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	var movie Movie
+	err := json.Unmarshal([]byte(request.Body), &movie)
 	if err != nil {
 		return events.APIGatewayProxyResponse{
 			StatusCode: http.StatusBadRequest,
-			Body:       "Count Header should be a number",
+			Body:       "Invalid payload",
 		}, nil
 	}
 	cfg, err := external.LoadDefaultAWSConfig()
@@ -36,29 +35,22 @@ func findAll(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 		}, nil
 	}
 	svc := dynamodb.New(cfg)
-	req := svc.ScanRequest(&dynamodb.ScanInput{
+	req := svc.PutItemRequest(&dynamodb.PutItemInput{
 		TableName: aws.String(os.Getenv("TABLE_NAME")),
-		Limit:     aws.Int64(int64(size)),
+		Item: map[string]dynamodb.AttributeValue{
+			"ID": dynamodb.AttributeValue{
+				S: aws.String(movie.ID),
+			},
+			"Name": dynamodb.AttributeValue{
+				S: aws.String(movie.Name),
+			},
+		},
 	})
-	res, err := req.Send()
+	_, err = req.Send()
 	if err != nil {
 		return events.APIGatewayProxyResponse{
 			StatusCode: http.StatusInternalServerError,
-			Body:       "Error while scanning DynamoDB",
-		}, nil
-	}
-	movies := make([]Movie, 0)
-	for _, item := range res.Items {
-		movies = append(movies, Movie{
-			ID:   *item["ID"].S,
-			Name: *item["Name"].S,
-		})
-	}
-	response, err := json.Marshal(movies)
-	if err != nil {
-		return events.APIGatewayProxyResponse{
-			StatusCode: http.StatusInternalServerError,
-			Body:       "Error while decoding to string value",
+			Body:       "Error while inserting movie to DynamoDB",
 		}, nil
 	}
 	return events.APIGatewayProxyResponse{
@@ -66,10 +58,9 @@ func findAll(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 		Headers: map[string]string{
 			"Content-Type": "application/json",
 		},
-		Body: string(response),
 	}, nil
 }
 
 func main() {
-	lambda.Start(findAll)
+	lambda.Start(update)
 }
