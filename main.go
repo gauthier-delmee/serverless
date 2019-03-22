@@ -14,7 +14,7 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 )
 
-// Movie structure
+// Movie entity
 type Movie struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
