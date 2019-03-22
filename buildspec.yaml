@@ -1,7 +1,7 @@
 version: 0.2
 env:
   variables:
-    S3_BUCKET: "movies-api-deployment-packages"
+    S3_BUCKET: "codepipeline-ap-southeast-2-255850556175"
     PACKAGE: "github.com/gauthier-delmee/serverless"
 
 phases:
